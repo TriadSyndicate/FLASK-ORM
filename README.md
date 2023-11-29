@@ -25,12 +25,12 @@ PyMongo, Flask backend with ORM allocation
 
 4. **Set Up Environment Variables:**
 
-    Create a `.env` file in the project root and add the following:
+    Create a `.env` file in the project root and add the following, NOTE: the formatting of the URI
 
     ```plaintext
     DB_USERNAME=your_db_username
     DB_PASSWORD=your_db_password
-    DB_URI=your_db_uri
+    DB_URI=mongodb+srv://%s:%s@mongo_db_url/
     ```
 
 ## Usage
