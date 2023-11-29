@@ -6,7 +6,7 @@ PyMongo, Flask backend with ORM allocation
 1. **Clone the repository:**
 
     ```bash
-    git clone https://github.com/your-username/project-name.git
+    git clone https://github.com/LightHouseSports/Backend-Flask-API-ORM.git
     ```
 
 2. **Setup Virtual Environment:**
