@@ -1,5 +1,5 @@
 from bson import ObjectId
-
+from models.player import Goal
 
 class MatchModel:
     def __init__(self, db):
