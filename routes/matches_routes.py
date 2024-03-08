@@ -4,6 +4,8 @@ from controllers.match_controller import MatchController
 from app import get_database_connection
 import json
 from functions import *
+from models.match import MatchStats
+from models.player import Goal
 # Initialize the MatchController and the blueprint
 db = get_database_connection()
 match_controller = MatchController(db)
