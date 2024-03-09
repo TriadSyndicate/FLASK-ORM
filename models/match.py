@@ -1,7 +1,14 @@
-from bson import ObjectId
-from mongoengine import *
+#models.match
 
-from models.player import Goal
+from mongoengine import Document, ReferenceField, StringField, BooleanField, \
+    IntField, EmbeddedDocumentListField, EmbeddedDocument, ListField
+from bson import ObjectId
+
+from models.player import Goal, Player
+from models.competition import Competition 
+from models.team import Team
+
+
 class MatchStats(EmbeddedDocument):
     match_id = ReferenceField('Match', dbref=False)
     player_id = ReferenceField('Player', dbref=False)
@@ -13,12 +20,7 @@ class MatchStats(EmbeddedDocument):
     red_cards = IntField(default=0)
     own_goals = IntField(default=0)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.match_id = kwargs['match_id']
-        self.player_id = kwargs['player_id']
-
-class Match(DynamicDocument):
+class Match(Document):
     competition_id = ReferenceField('Competition', dbref=False)
     home_team = ReferenceField('Team', dbref=False)
     away_team = ReferenceField('Team', dbref=False)
@@ -30,14 +32,11 @@ class Match(DynamicDocument):
     data_entered = BooleanField(default=False)
     match_events = ListField(default=[])
 
-    def __init__(self, *args, **values):
-        super().__init__(*args, **values)
-        self.competition_id = values['competition_id']
-        self.home_team = values['home_team']
-        self.away_team = values['away_team']
-        self.date = values['date']
-        self.venue = values['venue']
-        self.match_url = values['match_url']
+    meta = {
+        'collection': 'matches',
+        'strict': False
+    }
+    
 
     @classmethod
     def create_match(cls, competition_id, home_team, away_team, date, venue, match_url, home_stats, away_stats, data_entered, match_events):
@@ -54,22 +53,23 @@ class Match(DynamicDocument):
             "match_events": match_events,
         }
         match = cls(**match_data)
-        match.save()
-        return match.id
+        try:
+            match.save()
+            return str(match.id)
+        except Exception as e:
+            return {"error": f"Failed to create match: {str(e)}"}
 
     @classmethod
     def convert_object_ids_to_string(cls, data):
         if isinstance(data, dict):
-            serialized_data = {}
-            for key, value in data.items():
-                serialized_data[key] = cls.convert_object_ids_to_string(value)
-            return serialized_data
+            return {key: cls.convert_object_ids_to_string(value) for key, value in data.items()}
         elif isinstance(data, list):
             return [cls.convert_object_ids_to_string(item) for item in data]
         elif isinstance(data, ObjectId):
             return str(data)
         else:
             return data
+
 
     @classmethod
     def get_all_matches(cls):
@@ -78,24 +78,31 @@ class Match(DynamicDocument):
             serialized_matches = [cls.convert_object_ids_to_string(match.to_mongo()) for match in matches]
             return serialized_matches  # Return serialized matches as a list of dictionaries
         except Exception as e:
-            return {
-                "error": str(e)
-            }  # Returning an error dictionary if an exception occurs
+            return {"error": f"Failed to retrieve matches: {str(e)}"}
+
 
     @classmethod
     def get_match_by_id(cls, match_id):
-        return cls.objects(id=ObjectId(match_id)).first()
-
-    @classmethod
-    def get_matches_by_competitionId(cls, competitionId):
-        return cls.objects(competition_id=ObjectId(competitionId))
-
-    @classmethod
-    def get_matches_by_matchId_array(cls, matchIds):
         try:
-            # Convert string IDs to ObjectId
-            object_ids = [ObjectId(match_id) for match_id in matchIds]
+            match = cls.objects(id=ObjectId(match_id)).first()
+            return cls.convert_object_ids_to_string(match.to_mongo())
+        except Exception as e:
+            return {"error": f"Failed to retrieve match: {str(e)}"}
+
+    @classmethod
+    def get_matches_by_competitionId(cls, competition_id):
+        try:
+            matches = cls.objects(competition_id=ObjectId(competition_id))
+            return [cls.convert_object_ids_to_string(match.to_mongo()) for match in matches]
+        except Exception as e:
+            return {"error": f"Failed to retrieve matches: {str(e)}"}
+
+    @classmethod
+    def get_matches_by_matchId_array(cls, match_ids):
+        try:
+            object_ids = [ObjectId(match_id) for match_id in match_ids]
             matches = cls.objects(id__in=object_ids)
             return [cls.convert_object_ids_to_string(match.to_mongo()) for match in matches]
         except Exception as e:
-            return {"error": str(e)}
+            return {"error": f"Failed to retrieve matches: {str(e)}"}
+        

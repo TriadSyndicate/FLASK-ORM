@@ -4,6 +4,7 @@ from pymongo import MongoClient
 from controllers.match_controller import MatchController
 import urllib
 from dotenv import load_dotenv
+from mongoengine import connect
 import os
 
 load_dotenv()  # Load environment variables from .env file
@@ -13,14 +14,14 @@ def get_database_connection():
     db_username = urllib.parse.quote_plus(os.getenv("DB_USERNAME"))
     db_password = urllib.parse.quote_plus(os.getenv("DB_PASSWORD"))
     db_uri = os.getenv("DB_URI") % (db_username, db_password)
-    client = MongoClient(db_uri)
-    return client["ea_eye"]  # Return the desired database name
-
+    db = connect(alias='default', host=db_uri)
+    connect(alias='default', host=db_uri)
+    return db
 # Get the database connection
-db = get_database_connection()
+get_database_connection()
 
 # Initialize the MatchController
-match_controller = MatchController(db)
+match_controller = MatchController()
 
 # Brief landing page if someone somehow ends up on the API's home page
 @app.route('/')

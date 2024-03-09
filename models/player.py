@@ -1,13 +1,14 @@
+# models.player
 from mongoengine import *
 from bson.objectid import ObjectId
 
 class Goal(EmbeddedDocument):
     minute = IntField(default=None)
     match_id = ReferenceField('Match', dbref=False)
-    nt_match_id = ReferenceField('NtMatch', dbref=False)
 
     def __init__(self, *args, **values):
         super().__init__(*args, **values)
+        from models.match import Match
         self.minute = values['minute']
 
 
@@ -20,6 +21,7 @@ class PlayerTeam(EmbeddedDocument):
 
     def __init__(self, *args, **values):
         super().__init__(*args, **values)
+        from models.team import Team
         self.team_id = values['team_id']
         self.reg_date = values['reg_date']
         self.on_team = values['on_team']
@@ -105,6 +107,7 @@ class Player(DynamicDocument):
 
     def __init__(self, *args, **values):
         super().__init__(*args, **values)
+        from models.match import Match
         self.name = values['name']
         # self.first_name = self.name.split()[0]
         # self.last_name = self.name.split()[1]

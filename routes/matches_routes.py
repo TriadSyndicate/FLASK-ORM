@@ -8,7 +8,7 @@ from models.match import MatchStats
 from models.player import Goal
 # Initialize the MatchController and the blueprint
 db = get_database_connection()
-match_controller = MatchController(db)
+match_controller = MatchController()
 matches_blueprint = Blueprint('matches', __name__)
 
 @matches_blueprint.route("/matches", methods=["GET"])
