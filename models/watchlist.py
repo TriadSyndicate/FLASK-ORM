@@ -7,6 +7,10 @@ class WatchList(DynamicDocument):
     scout_name = StringField()
     category = StringField()
     add_date = StringField()
+    meta = {
+    'collection': 'watchlist',
+    'strict': False
+    }
 
     def __init__(self, *args, **values):
         super().__init__(*args, **values)

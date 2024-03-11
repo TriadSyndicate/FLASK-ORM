@@ -27,6 +27,10 @@ class short_report(DynamicDocument):
     conclusion = StringField()
     strengths = EmbeddedDocumentListField(attribute_list)
     weaknesses = EmbeddedDocumentListField(attribute_list)
+    meta = {
+    'collection': 'short_reports',
+    'strict': False
+    }
 
     def __init__(self, *args, **values):
         super().__init__(*args, **values)

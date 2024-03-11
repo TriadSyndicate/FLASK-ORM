@@ -15,6 +15,10 @@ class Fixture(Document):
     competition = ReferenceField('Competition')
     comp_year = StringField(default=None)
     rounds = EmbeddedDocumentListField('Round', default=[])
+    meta = {
+    'collection': 'fixtures',
+    'strict': False
+    }
 
     def __init__(self, *args, **values):
         super().__init__(*args, **values)

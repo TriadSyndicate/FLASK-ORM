@@ -6,6 +6,10 @@ class Team(Document):
     roster = ListField(ReferenceField('Player', dbref=True, default=[]))
     matches = ListField(ReferenceField('Match', dbref=True, default=[]))
     comps = ListField(ReferenceField('Competition', dbref=True, default=[]))
+    meta = {
+        'collection': 'teams',
+        'strict': False
+    }
 
     def __init__(self, *args, **values):
         super().__init__(*args, **values)

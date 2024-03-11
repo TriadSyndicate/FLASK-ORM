@@ -8,6 +8,10 @@ class ShortList(DynamicDocument):
     player_ids = ListField(ReferenceField('Player', dbref=False))
     category = StringField()
     week = IntField()
+    meta = {
+    'collection': 'short_list',
+    'strict': False
+    }
 
     def __init__(self, *args, **values):
         super().__init__(*args, **values)

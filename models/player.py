@@ -2,19 +2,14 @@
 from mongoengine import *
 from bson.objectid import ObjectId
 
-class Goal(EmbeddedDocument):
-    minute = IntField(default=None)
-    match_id = ReferenceField('Match', dbref=False)
-
-    def __init__(self, *args, **values):
-        super().__init__(*args, **values)
-        from models.match import Match
-        self.minute = values['minute']
-
+from functions import return_oid
+from models.match import MatchStats
+from models.goal import Goal
 
 
 
 class PlayerTeam(EmbeddedDocument):
+    _id = ObjectIdField(default=ObjectId, required=True, primary_key=True)
     team_id = ReferenceField('Team', dbref=False)
     reg_date = StringField(default=None)
     on_team = BooleanField(default=True)
@@ -99,21 +94,21 @@ class Player(DynamicDocument):
     nationality = StringField(default='none')
     jersey_num = IntField(default=0)
     position = StringField(default=None)
-    stats = EmbeddedDocumentField(Stats)
-    performance = EmbeddedDocumentListField(PlayerPerformance)
+    stats = EmbeddedDocumentField('Stats')
+    performance = EmbeddedDocumentField(PlayerPerformance)
     teams = EmbeddedDocumentListField(PlayerTeam, default=[])
     matches = ListField(ReferenceField('Match', dbref=False))
     supporting_file = StringField(default=None)
+    meta = {
+    'collection': 'players',
+    'strict': False
+    }
 
-    def __init__(self, *args, **values):
-        super().__init__(*args, **values)
-        from models.match import Match
-        self.name = values['name']
-        # self.first_name = self.name.split()[0]
-        # self.last_name = self.name.split()[1]
-        self.dob = values['dob']
-        self.nationality = values['nationality']
-        self.jersey_num = values['jersey_num']
-        self.supporting_file = values['supporting_file']
-        self.position = values['position']
-        self.stats = Stats().to_mongo()
+
+    @classmethod
+    def get_player_by_id(cls, player_id):
+        try:
+            player = cls.objects(id=ObjectId(player_id)).first()
+            return cls.convert_object_ids_to_string(player.to_mongo())
+        except Exception as e:
+            return {"error": f"Failed to retrieve player: {str(e)}"}

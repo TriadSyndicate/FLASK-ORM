@@ -35,3 +35,13 @@ def edit_html_desc(html_response, new_desc):
     new_response = copy.deepcopy(html_response)
     new_response[0]['Description'] = new_desc
     return new_response
+
+def convert_object_ids_to_string(data):
+    if isinstance(data, dict):
+        return {key: convert_object_ids_to_string(value) for key, value in data.items()}
+    elif isinstance(data, list):
+        return [convert_object_ids_to_string(item) for item in data]
+    elif isinstance(data, ObjectId):
+        return str(data)
+    else:
+        return data

@@ -18,6 +18,10 @@ class recommendation_report(DynamicDocument):
     improve = StringField()
     explain_improve = StringField()
     recommendation_monitor = StringField()
+    meta = {
+    'collection': 'recommendation_reportv2',
+    'strict': False
+    }
 
     def __init__(self, *args, **values):
         super().__init__(*args, **values)

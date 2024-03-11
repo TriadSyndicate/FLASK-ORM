@@ -4,22 +4,22 @@ from mongoengine import Document, ReferenceField, StringField, BooleanField, \
     IntField, EmbeddedDocumentListField, EmbeddedDocument, ListField
 from bson import ObjectId
 
-from models.player import Goal, Player
+
 from models.competition import Competition 
 from models.team import Team
-
+from models.goal import Goal
 
 class MatchStats(EmbeddedDocument):
     match_id = ReferenceField('Match', dbref=False)
     player_id = ReferenceField('Player', dbref=False)
     starter = BooleanField(default=False)
     min_played = IntField(default=0)
-    goals = EmbeddedDocumentListField(Goal, default=[])
+    goals = EmbeddedDocumentListField('Goal', default=[])
     assists = IntField(default=0)
     yellow_cards = IntField(default=0)
     red_cards = IntField(default=0)
     own_goals = IntField(default=0)
-
+        
 class Match(Document):
     competition_id = ReferenceField('Competition', dbref=False)
     home_team = ReferenceField('Team', dbref=False)
@@ -27,8 +27,8 @@ class Match(Document):
     date = StringField()
     venue = StringField(default=None)
     match_url = StringField(default=None)
-    home_stats = EmbeddedDocumentListField(MatchStats, dbref=False, default=[])
-    away_stats = EmbeddedDocumentListField(MatchStats, dbref=False, default=[])
+    home_stats = EmbeddedDocumentListField('MatchStats', dbref=False, default=[])
+    away_stats = EmbeddedDocumentListField('MatchStats', dbref=False, default=[])
     data_entered = BooleanField(default=False)
     match_events = ListField(default=[])
 
