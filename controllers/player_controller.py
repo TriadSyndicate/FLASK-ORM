@@ -1,4 +1,6 @@
-import datetime
+from datetime import datetime
+import time
+from bson import ObjectId
 from flask import jsonify, request
 import pytz
 from functions import convert_object_ids_to_string, return_oid
@@ -349,3 +351,132 @@ class PlayerController:
             team_stats.append(match_stats)
 
         return team_stats, new_career_stats, match_events,
+    def get_regex_from_year(cls, year):
+        str_year = str(year)
+        regex = f".+20[{str_year[-2]}-9][{str_year[-1]}-9]|20[{int(str_year[-2]) + 1}-9][0-9]."
+        return regex
+    
+    def convert_object_ids_to_string(cls, data):
+        if isinstance(data, dict):
+            return {key: cls.convert_object_ids_to_string(value) for key, value in data.items()}
+        elif isinstance(data, list):
+            return [cls.convert_object_ids_to_string(item) for item in data]
+        elif isinstance(data, ObjectId):
+            return str(data)
+        else:
+            return data
+    
+    def getPlayerSpecific(self, collection_ids):
+        try:
+            current_year = datetime.now().year
+            find_year = current_year - 21
+            regex = self.get_regex_from_year(find_year)
+            pipeline = [
+                {
+                    '$match': {
+                        'comps': {
+                            '$in':
+                                collection_ids
+
+                        }
+                    }
+                }, {
+                    '$lookup': {
+                        'from': 'players',
+                        'localField': 'roster',
+                        'foreignField': '_id',
+                        'as': 'matched_players'
+                    }
+                }, {
+                    '$lookup': {
+                        'from': 'teams',
+                        'localField': 'matched_players.teams.team_id',
+                        'foreignField': '_id',
+                        'as': 'team_names'
+                    }
+                }, {
+                    '$unwind': '$team_names'
+                }, {
+                    '$unwind': '$matched_players'
+                }, {
+                    '$match': {
+                        'matched_players.dob': {
+                            '$regex': regex
+                        }
+                    }
+                }, {
+                    '$addFields': {
+                        'name': '$matched_players.name',
+                        'dob': '$matched_players.dob',
+                        'nationality': '$matched_players.nationality',
+                        'jersey_num': '$matched_players.jersey_num',
+                        'id': '$matched_players._id',
+                        'position': '$matched_players.position',
+                        'matches': {
+                            '$size': '$matched_players.matches'
+                        },
+                        'stats': '$matched_players.stats',
+                        'yearCount': True
+                    }
+                }, {
+                    '$group': {
+                        '_id': '$id',
+                        'name': {
+                            '$first': '$name'
+                        },
+                        'dob': {
+                            '$first': '$dob'
+                        },
+                        'nationality': {
+                            '$first': '$nationality'
+                        },
+                        'jersey_num': {
+                            '$first': '$jersey_num'
+                        },
+                        'matches': {
+                            '$first': '$matches'
+                        },
+                        'position':{
+                            '$first': '$position'
+                        },
+                        'id': {
+                            '$first': '$matched_players._id'
+                        },
+                        'stats': {
+                            '$first': '$stats'
+                        },
+                        'yearCount': {
+                            '$first': '$yearCount'
+                        },
+                        'team_names': {
+                            '$push': '$team_names.name'
+                        }
+                    }
+                }, {
+                    '$project': {
+                        'name': 1,
+                        'dob': 1,
+                        'nationality': 1,
+                        'jersey_num': 1,
+                        'id': 1,
+                        'matches': 1,
+                        'stats': 1,
+                        'yearCount': 1,
+                        'team_names': 1,
+                        'position':1,
+                        '_id': 0
+                    }
+                }
+            ]
+            start_time = time.time()
+            docs = Team.objects.aggregate(pipeline)
+            result_list = [self.convert_object_ids_to_string(team) for team in docs]
+            print(list(docs))
+            # docs = sorted(players_cursor, key=lambda x: x['name'])
+            end_time = time.time()
+            execution_time = end_time - start_time
+            print(f"Execution time for cursor: {execution_time} seconds")
+
+            return jsonify({"players": result_list}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
