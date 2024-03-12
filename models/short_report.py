@@ -45,8 +45,37 @@ class short_report(DynamicDocument):
         self.position = values.get('position', '')
         self.summary = values.get('summary', '')
         self.grade = values.get('grade', '')
-
-
-
-class shortReport(EmbeddedDocument):
-    report_id = ReferenceField(short_report)
+    
+    @classmethod
+    def create_short_report(cls, player_id, match_id, 
+                            formation, position_played,
+                            report_date, scout_name, 
+                            player_profile, match_view, game_context, position, 
+                            physical_profile, summary, conclusion, grade, action,
+                            time_ready, strengths, weaknesses):
+        short_report_data = {
+            "player_id": player_id,
+            "match_id": match_id, 
+            "formation": formation,
+            "position_played": position_played,
+            "report_date": report_date,
+            "scout_name": scout_name,
+            "player_profile": player_profile,
+            "match_view": match_view,
+            "game_context": game_context,
+            "position": position,
+            "physical_profile": physical_profile,
+            "summary": summary,
+            "conclusion": conclusion,
+            "grade": grade,
+            "action": action,
+            "time_ready": time_ready,
+            "strengths": strengths,
+            "weaknesses": weaknesses
+        }
+        short_report = cls(**short_report_data)
+        try:
+            short_report.save()
+            return str(short_report.id)
+        except Exception as e:
+            return {"error": f"Failed to create short report: {str(e)}"}

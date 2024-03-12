@@ -480,3 +480,15 @@ class PlayerController:
             return jsonify({"players": result_list}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+        
+    # fetching player details
+    def fetch_player_details(self, player_id):
+        try:
+            # Try to find player with the given ID
+            player = Player.objects.get(id=player_id)
+            # Return the extracted details
+            return player
+
+        except DoesNotExist:
+            # If player not found, return an error message
+            return {'error': 'Player not found'}

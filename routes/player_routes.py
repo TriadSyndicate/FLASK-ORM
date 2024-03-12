@@ -14,3 +14,5 @@ def get_players_specific():
     collection_ids_str = request.args.get('ids')
     collection_ids = [ObjectId(id.strip()) for id in collection_ids_str.split(',')]
     return player_controller.getPlayerSpecific(collection_ids)
+
+# insert / create player / move player

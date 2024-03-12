@@ -24,3 +24,5 @@ def get_team_by_id(team_id):
 @teams_blueprint.route('/with-players/get-by-id/<team_id>', methods=['GET'])
 def get_team_and_players_by_id(team_id):
     return team_controller.get_team_and_players_by_id(team_id)
+
+# Create team endpoint

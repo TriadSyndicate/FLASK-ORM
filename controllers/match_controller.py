@@ -139,3 +139,13 @@ class MatchController:
                 return jsonify({"match": Match.convert_object_ids_to_string(updated_match_document.to_mongo())}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
+    
+    # Fetch match by id and return document
+    def fetch_match_details(self, match_id):
+        try:
+            # Try to find a match with the given ID
+            match = Match.objects.get(id=match_id)
+            return match
+        except DoesNotExist:
+            # If match not found, return an error message
+            return {'error': 'Match not found'}
