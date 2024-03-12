@@ -14,4 +14,3 @@ class Body(Document):
     def __init__(self, *args, **values):
         super().__init__(*args, **values)
         from models.competition import Competition
-        self.name = values['name']

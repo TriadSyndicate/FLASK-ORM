@@ -2,11 +2,13 @@
 from bson import ObjectId
 from mongoengine import *
 
+from functions import return_oid
+
 class Team(Document): 
     name = StringField(required=True)
-    roster = ListField(ReferenceField('Player', dbref=True, default=[]))
-    matches = ListField(ReferenceField('Match', dbref=True, default=[]))
-    comps = ListField(ReferenceField('Competition', dbref=True, default=[]))
+    roster = ListField(ReferenceField('Player', dbref=False, default=[]))
+    matches = ListField(ReferenceField('Match', dbref=False, default=[]))
+    comps = ListField(ReferenceField('Competition', dbref=False, default=[]))
     meta = {
         'collection': 'teams',
         'strict': False
@@ -17,10 +19,8 @@ class Team(Document):
         from models.match import Match
         from models.competition import Competition
         from models.player import Player
-        self.name = values['name']
-        self.roster = values['roster']
-        self.matches = values['matches']
-        self.comps = values['comps']
+        self.player = Player()
+        self.competition = Competition()
         
     @classmethod
     def convert_object_ids_to_string(cls, data):
@@ -45,7 +45,7 @@ class Team(Document):
     def get_all_teams(cls):
         try:
             teams = cls.objects()
-            serialized_teams = [cls.convert_object_ids_to_string(team.to_mongo() for team in teams)]
+            serialized_teams = [cls.convert_object_ids_to_string(team.to_mongo()) for team in teams]
             return serialized_teams
         except Exception as e :
             return {"error": f"Failed to retrieve teams: {str(e)}"}

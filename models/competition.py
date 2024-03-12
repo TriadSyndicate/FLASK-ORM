@@ -3,7 +3,7 @@ from mongoengine import *
 
 class Competition(Document):
     name = StringField(required=True)
-    teams = ListField(ReferenceField('Team', dbref=True, default=[]))
+    teams = ListField(ReferenceField('Team', dbref=False, default=[]))
     body_id = ReferenceField('Body', dbref=False, default=None)
     meta = {
     'collection': 'competitions',
@@ -12,6 +12,5 @@ class Competition(Document):
 
     def __init__(self, *args, **values):
         super().__init__(*args, **values)
-        self.name = values['name']
-        self.teams = values['teams']
-        self.body_id = values['body_id']
+        from models.body import Body
+        from models.team import Team

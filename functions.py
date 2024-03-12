@@ -1,8 +1,8 @@
 import copy
 import json
 import traceback
-
-from bson import json_util, ObjectId
+from mongoengine.queryset.queryset import QuerySet
+from bson import DBRef, json_util, ObjectId
 
 from htmlcodes import *
 
@@ -36,12 +36,24 @@ def edit_html_desc(html_response, new_desc):
     new_response[0]['Description'] = new_desc
     return new_response
 
-def convert_object_ids_to_string(data):
-    if isinstance(data, dict):
-        return {key: convert_object_ids_to_string(value) for key, value in data.items()}
-    elif isinstance(data, list):
-        return [convert_object_ids_to_string(item) for item in data]
-    elif isinstance(data, ObjectId):
-        return str(data)
-    else:
-        return data
+def convert_object_ids_to_string(obj):
+    if isinstance(obj, dict):
+        # Convert each value in the dictionary
+        for key, value in obj.items():
+            obj[key] = convert_object_ids_to_string(value)
+    elif isinstance(obj, list):
+        # Convert each element in the list
+        for i in range(len(obj)):
+            obj[i] = convert_object_ids_to_string(obj[i])
+    elif isinstance(obj, ObjectId):
+        # Convert ObjectId to string
+        return str(obj)
+    elif isinstance(obj, QuerySet):
+        # Convert QuerySet to a list of dictionaries
+        return convert_object_ids_to_string(list(obj))
+    elif isinstance(obj, DBRef):
+        # Handle DBRef objects (customize as needed)
+        return str(obj.id)
+    # Add more custom logic for other non-serializable types if needed
+
+    return obj
