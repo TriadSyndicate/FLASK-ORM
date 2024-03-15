@@ -9,7 +9,7 @@ from functions import *
 player_controller = PlayerController()
 players_blueprint = Blueprint('players', __name__)
 
-@players_blueprint.route('/players/get-players', methods=['GET'])
+@players_blueprint.route('/get-all', methods=['GET'])
 def get_players_specific():
     collection_ids_str = request.args.get('ids')
     collection_ids = [ObjectId(id.strip()) for id in collection_ids_str.split(',')]
