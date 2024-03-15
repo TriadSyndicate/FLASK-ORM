@@ -4,11 +4,17 @@ from mongoengine import *
 
 from functions import return_oid
 
+class PastPlayer(EmbeddedDocument):
+    _id = ObjectIdField(default=ObjectId, required=True, primary_key=True)
+    player_id = ReferenceField('Team', dbref=False)
+    start_date = StringField(default=None)
+    end_date = StringField(default=None)
 class Team(Document): 
     name = StringField(required=True)
     roster = ListField(ReferenceField('Player', dbref=False, default=[]))
     matches = ListField(ReferenceField('Match', dbref=False, default=[]))
     comps = ListField(ReferenceField('Competition', dbref=False, default=[]))
+    past_players = EmbeddedDocumentListField(PastPlayer, default=[])
     meta = {
         'collection': 'teams',
         'strict': False
