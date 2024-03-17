@@ -34,3 +34,9 @@ def upload_match_data_v2():
     # load in match data from html request
     data = json.loads(request.data)
     return match_controller.match_data_upload(data=data)
+
+# edit match - endpoint 
+@matches_blueprint.route('/edit-match', methods=['POST'])
+def edit_match():
+    data = json.loads(request.data)
+    return match_controller.edit_match(data=data)
