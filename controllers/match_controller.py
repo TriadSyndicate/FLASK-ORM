@@ -157,8 +157,8 @@ class MatchController:
         comp_data = data['Competition']
 
         match_id = return_oid(comp_data['MatchID'])
-        db_match = Match.objects(id=match_id)
-
+        db_match = Match.objects.get(id=match_id)
+        
         home_players = home_data['Starters'] + home_data['Subs']
         away_players = away_data['Starters'] + away_data['Subs']
 
@@ -182,7 +182,7 @@ class MatchController:
         return jsonify({"match": Match.convert_object_ids_to_string(updated_match_document.to_mongo())}), 200
 
 
-    def update_match_data(db_match, home_match_stats, match_events, away_match_stats):
+    def update_match_data(self, db_match, home_match_stats, match_events, away_match_stats):
         db_match_stats_players = {stat['player_id'] for stat in db_match['home_stats'] + db_match['away_stats']}
         match_stats_players = {stat['player_id'] for stat in home_match_stats}
 
@@ -190,18 +190,15 @@ class MatchController:
         players_only_in_match = match_stats_players - db_match_stats_players
         unique_players = players_only_in_db.union(players_only_in_match)
 
-        for players_id in unique_players:
-            performance = get_stats(return_oid(players_id))
-            stats = get_player_stats(return_oid(players_id))
-            db.players.update_one(
-                {'_id': return_oid(return_oid(players_id))},
-                {
-                    '$set': {
-                        'stats': stats.to_mongo(),
-                        'performance': performance,
-                    },
-                }
+        for player_id in unique_players:
+            player_id = player_id.id
+            performance = self.PC.get_player_long_stats(player_id)
+            stats = self.PC.get_player_stats(player_id)
+            player = Player.objects.get(id=player_id).update(
+                set__stats = stats.to_mongo(),
+                set__performance = performance
             )
+            print('myPlayer ', convert_object_ids_to_string(player))
 
         for match_stats in home_match_stats:
             val = False
@@ -209,66 +206,28 @@ class MatchController:
                 if match_stats['player_id'] == db_match_stats['player_id']:
                     val = True
 
-                    if get_player_performance_match(match_events, match_stats,
-                                                    home_match_stats) != get_player_performance_match(
+                    if self.PC.get_player_performance_match(match_events, match_stats,
+                                                    home_match_stats) != self.PC.get_player_performance_match(
                         db_match['match_events'], db_match_stats, home_match_stats):
-                        performance = get_stats(match_stats['player_id'])
-                        stats = get_player_stats(match_stats['player_id'])
-                        db.players.update_one(
-                            {'_id': return_oid(match_stats['player_id'])},
-                            {
-                                '$set': {
-                                    'stats': stats.to_mongo(),
-                                    'performance': performance,
-                                },
-                            }
-                        )
+                        performance = self.PC.get_player_long_stats(match_stats['player_id'])
+                        stats = self.PC.get_player_stats(match_stats['player_id'])
+                        player = Player.objects.get(id=player_id)
+                        player.stats = stats.to_mongo()
+                        player.performance = performance
+                        player.save()
                     else:
                         print('no changes',
-                            get_player_performance_match(match_events, match_stats, home_match_stats).to_dict())
+                            self.PC.get_player_performance_match(match_events, match_stats, home_match_stats).to_dict())
 
         for match_stats in away_match_stats:
             for db_match_stats in db_match['home_stats'] + db_match['away_stats']:
                 if match_stats['player_id'] == db_match_stats['player_id']:
 
-                    if get_player_performance_match(match_events, match_stats,
-                                                    away_match_stats) != get_player_performance_match(
+                    if self.PC.get_player_performance_match(match_events, match_stats,
+                                                    away_match_stats) != self.PC.get_player_performance_match(
                         db_match['match_events'], db_match_stats, away_match_stats):
                         print(match_stats['player_id'],
-                            get_player_performance_match(match_events, match_stats, away_match_stats).to_dict())
+                            self.PC.get_player_performance_match(match_events, match_stats, away_match_stats).to_dict())
                     else:
-                        print('nosisi', get_player_performance_match(match_events, match_stats, away_match_stats).to_dict())
+                        print('nosisi', self.PC.get_player_performance_match(match_events, match_stats, away_match_stats).to_dict())
 
-
-    def get_player_performance_match(match_events, match_stats, all_stats):
-        detailed_stats = PlayerPerformance()
-        start_min = 0
-        end_min = 0
-        if match_stats['starter'] is True:
-            detailed_stats = check_and_fill(detailed_stats, 'appearances', 1)
-            detailed_stats = check_and_fill(detailed_stats, 'starts', 1)
-            end_min = 90
-        for event in match_events:
-
-            if 'assist' in event:
-                # print('event', event)
-                event['playerId'] = event['assisterId']
-            if return_oid(match_stats['player_id']) == return_oid(event['playerId']):
-                print('event', event)
-
-                if 'PlayerSubbedOut' in event:
-                    end_min = int(event['minute'])
-                if 'PlayerSubbedIn' in event:
-                    detailed_stats = check_and_fill(detailed_stats, 'appearances', 1)
-                    start_min = int(event['minute'])
-                    end_min = 90
-                if 'goal' in event:
-                    detailed_stats = check_and_fill(detailed_stats, 'goals', 1)
-                if 'assist' in event:
-                    detailed_stats = check_and_fill(detailed_stats, 'assists', 1)
-        mins = end_min - start_min
-        detailed_stats = check_and_fill(detailed_stats, 'mins', mins)
-
-        detailed_stats = PC.get_player_performance_for_match(match_events, start_min, end_min, detailed_stats, all_stats)
-
-        return detailed_stats

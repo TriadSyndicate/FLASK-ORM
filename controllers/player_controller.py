@@ -3,16 +3,17 @@ import time
 from bson import ObjectId
 from flask import jsonify, request
 import pytz
-from functions import convert_object_ids_to_string, return_oid
+from functions import convert_object_ids_to_string, print_and_return_error, return_oid
 
 from mongoengine import DoesNotExist
 
-from models.player import Player, PlayerPerformance
+from models.player import Player, PlayerPerformance, Stats
 from models.goal import Goal
-from models.match import MatchStats
+from models.match import MatchStats, Match
 from models.team import Team
 from functions import return_oid
 from dateutil import parser
+from mongoengine.queryset.visitor import Q
 
 class PlayerController:
     def __init__(self):
@@ -492,3 +493,297 @@ class PlayerController:
         except DoesNotExist:
             # If player not found, return an error message
             return {'error': 'Player not found'}
+        
+    # Method to get team_matches -- PC hamza
+    def get_team_matches(self, player):
+        dates = []
+        utc = pytz.UTC
+        team_matches_played = []
+        for i in range(len(player['teams'])):
+            # print(player['teams'][i + 1]['reg_date'])
+            t = player['teams'][i]
+            # Assuming t['team_id'] holds the team model you're searching for
+            team_id = t['team_id'].id
+
+            # Query matches where either away_team or home_team matches the team_id
+            matches = Match.objects.filter(
+                Q(away_team=team_id) | Q(home_team=team_id)
+            )
+            start_date = parser.parse(t['reg_date'])
+            start_date = utc.localize(start_date)
+            
+            if t['on_team'] is False:
+                # Get the next team's registration date as the end_date
+                try:
+                    end_date = parser.parse(player['teams'][i + 1]['reg_date'])
+                    end_date = utc.localize(end_date)
+                except:
+                    end_date = None
+            else:
+                # If no next team, set end_date to None or any other placeholder
+                end_date = None
+
+            for m in matches:
+                if m['date'] is not None:
+                    if m['date'] != "":
+                        date, _ = parser.parse(m['date'], fuzzy_with_tokens=True)
+
+                        if date.tzinfo is None or date.tzinfo.utcoffset(date) is None:
+                            # Date is naive, localize it
+                            date = utc.localize(date)  # Make date offset-aware
+                # date = utc.localize(date)
+                if 'data_entered' in m:
+                    if end_date is not None:
+                        if end_date >= date >= start_date:
+                            team_matches_played.append(m)
+                    else:
+                        if start_date <= date:
+                            team_matches_played.append(m)
+        # stats we need team_matches, md_squad, appearences, starts, mins , 90s, %matches played, %pot mins, goals,
+        # gp90, mpg, assisits, ap90, goal controbutions, conceded, cp90, clean sheets
+        return team_matches_played
+    
+    # Minutes played in a match, args - playerId, MatchId -- derives
+    def mins_played_in_match(self, player_id, match_id):
+        match_id = return_oid(match_id)
+        player_id = return_oid(player_id)
+
+        # Execute the query with filtering and projection
+        result = Match.objects.only(
+            'home_stats', 'away_stats', 'match_events'
+        ).filter(
+            id=match_id,
+        ).first()
+        print('560 result', result)
+        # Convert the result to dictionary format if needed
+        result = result.to_mongo().to_dict() if result else None
+        stats = []
+        mins_played = {}
+        played = False
+
+        # some matches are empty hence the need to enclose a try except in a try except for empty stuffs
+        try:
+            try:
+                stats = (result['away_stats'])
+            except KeyError:
+                stats = (result['home_stats'])
+        except KeyError:
+            print('no stats for match')
+        for s in stats:
+            if s['min_played'] > 0:
+                played = True
+            if s['starter'] is True:
+                played = True
+                min_out = s['min_played']
+                mins_played.update({'start': 0})
+                mins_played.update({'end': min_out})
+            else:
+                if 'match_events' in result:
+                    for events in result['match_events']:
+                        if 'PlayerSubbedIn' in events:
+                            played = True
+                    min_in = 90 - (s['min_played'])
+                    mins_played.update({'start': min_in})
+                    mins_played.update({'end': 90})
+        return mins_played, played, result
+
+    def get_away_or_home(self, player_id, match_id):
+        # Convert the match_id to ObjectId
+        match_id = ObjectId(match_id)
+        # Perform the query using the Match model
+        result = Match.objects.filter(
+            id=match_id,
+            home_stats__player_id=player_id, away_stats__player_id=player_id
+        ).first()
+        return result
+    
+    # Goals conceded per match fn 
+    def goals_conceded_per_match(self, matches, player_id):
+        conceded = 0
+        played = {}
+        start_time = time.time()
+        start_time = time.time()
+        mins_played, did_he_play, result = self.mins_played_in_match(match_id=matches.id, player_id=player_id)
+        if 'home_stats' in result:
+            played.update({'enemy': 'away_stats'})
+        else:
+            played.update({'enemy': 'home_stats'})
+        print('mpim', time.time() - start_time)
+        if mins_played:
+            start_min = mins_played['start']
+            end_min = mins_played['end']
+            for stats in matches[played['enemy']]:
+                for g in stats['goals']:
+                    min = abs(g['minute'])
+                    if min > start_min:
+                        conceded += 1
+        return conceded, did_he_play
+
+    def get_clean_conceded_appear(self, team_matches, player_id):
+        clean_sheets = 0
+        conceded_here = 0
+        appearences = 0
+
+        for match in team_matches:
+            conceded, did_he_play = self.goals_conceded_per_match(match, player_id)
+            conceded_here += conceded
+            if conceded == 0:
+                clean_sheets += 1
+            if did_he_play:
+                appearences += 1
+        return clean_sheets, conceded_here, appearences
+    
+        
+    def get_player_long_stats(self, player_id):
+        # player_id = fc.return_oid('6520178d639acd1462890726')
+        pp = PlayerPerformance()
+        player = Player.objects.get(id=return_oid(player_id))
+
+        start_time = time.time()
+        players_teams_matches = self.get_team_matches(player)
+        print("Time taken for get_team_matches:", time.time() - start_time)
+
+        pp.team_matches = len(players_teams_matches)
+        
+        start_time = time.time()
+        # Get player matches matchIds
+        match_ids = [match_id.id for match_id in player['matches']]
+        pp.clean_sheets, pp.conceded, pp.appearances = self.get_clean_conceded_appear(
+            Match.objects.filter(id__in=match_ids),
+            player.id)
+        print("Time taken for cca:", time.time() - start_time)
+
+        pp.starts = player['stats']['starter']
+
+        pp.mins = player['stats']['min_played']
+        pp.mins_90s = pp.mins / 90 if pp.mins > 0 else 0
+        pp.percent_matches = (
+                                     pp.appearances / pp.team_matches) * 100 if pp.team_matches > 0 else 0  # Ensure non-zero denominator
+        pp.percent_potential_mins = (
+                pp.mins / (90 * pp.appearances) * 100) if pp.appearances > 0 else 0  # Ensure non-zero denominator
+        pp.goals = len(player['stats']['goals'])
+        if pp.mins_90s > 0:
+            pp.goals_per_90 = pp.goals / pp.mins_90s
+        else:
+            pp.goals_per_90 = 0
+
+        if pp.goals > 0:
+            pp.mins_per_goal = pp.mins / pp.goals
+        else:
+            pp.mins_per_goal = 0
+        pp.assists = player['stats']['assists']
+        pp.assists_per_90 = pp.assists / pp.mins_90s if pp.mins_90s > 0 else 0  # Ensure non-zero denominator
+        pp.goal_contributions = pp.goals + pp.assists
+        if pp.mins_90s > 0:
+            pp.goal_contributions_per_90 = pp.goal_contributions / pp.mins_90s
+        else:
+            pp.goal_contributions_per_90 = 0
+        # print(self.mins_played_in_match(player_id=player['_id'], match_id=players_teams_matches[1]['_id']))
+
+        pp.conceded_per_90 = pp.conceded / pp.mins_90s if pp.mins_90s > 0 else 0  # Ensure non-zero denominator
+        start_time = time.time()
+
+        print("Time taken for clean_sheets:", time.time() - start_time)
+        print('player_id', player.id)
+        return pp.to_dict()
+    
+    # get player stats - bryce fn
+    def get_player_stats(self, player_id):
+        try:
+            player = Player.objects.get(id=return_oid(player_id))
+            stats = Stats()
+            matches = Match.objects.filter(id__in=[mid.id for mid in player.matches])
+            for match in matches:
+                for match_stats in match['home_stats'] + match['away_stats']:
+                    if match_stats['player_id'] == return_oid(player_id):
+                        print(match_stats)
+                        stats['match_day_squad'] += 1
+                        min_played = match_stats['min_played']
+                        if match_stats['starter']:
+                            stats['starter'] += 1
+                            stats['starter_minutes'] += min_played
+                        else:
+                            stats['sub_minutes'] += min_played
+                        stats['min_played'] += min_played
+                        for m in match_stats['goals']:
+                            stats['goals'].append(m)
+                        stats['assists'] += match_stats['assists']
+                        stats['yellow_cards'] += match_stats['yellow_cards']
+                        stats['red_cards'] += match_stats['red_cards']
+                        if 'own_goals' in match_stats.keys():
+                            stats['own_goals'] += match_stats['own_goals']
+                        break
+            print('allstats', stats)
+
+            return stats
+        except Exception as e:
+            print_and_return_error(e)
+            
+    def get_player_performance_match(self, match_events, match_stats, all_stats):
+        detailed_stats = PlayerPerformance()
+        start_min = 0
+        end_min = 0
+        if match_stats['starter'] is True:
+            detailed_stats = self.check_and_fill(detailed_stats, 'appearances', 1)
+            detailed_stats = self.check_and_fill(detailed_stats, 'starts', 1)
+            end_min = 90
+        for event in match_events:
+            if 'assist' in event:
+                event['playerId'] = event['assisterId']
+            if match_stats['player_id'].id == return_oid(event['playerId']):
+                print('event', event)
+
+                if 'PlayerSubbedOut' in event:
+                    end_min = int(event['minute'])
+                if 'PlayerSubbedIn' in event:
+                    detailed_stats = self.check_and_fill(detailed_stats, 'appearances', 1)
+                    start_min = int(event['minute'])
+                    end_min = 90
+                if 'goal' in event:
+                    detailed_stats = self.check_and_fill(detailed_stats, 'goals', 1)
+                if 'assist' in event:
+                    detailed_stats = self.check_and_fill(detailed_stats, 'assists', 1)
+        mins = end_min - start_min
+        detailed_stats = self.check_and_fill(detailed_stats, 'mins', mins)
+
+        detailed_stats = self.get_player_performance_for_match(match_events, start_min, end_min, detailed_stats, all_stats)
+
+        return detailed_stats
+    
+    def get_player_performance_for_match(self, match_events, start_mins, end_mins, detailed_stats, all_stats):
+        # MATCH DATA IS ENEMY DATA
+        clean_sheet = True
+        for events in match_events:
+            if 'goal' in events:
+                yes = False
+                for players in all_stats:
+                    # print('allstats',players)
+                    if return_oid(events['playerId']) == return_oid(players['player_id'].id):
+                        # print('event in same team')
+                        yes = True
+                if not yes:
+                    if start_mins < events['minute'] < end_mins:
+                        clean_sheet = False
+                        detailed_stats = self.check_and_fill(detailed_stats, 'conceded', 1)
+        if clean_sheet:
+            detailed_stats = self.check_and_fill(detailed_stats, 'clean_sheets', 1)
+        detailed_stats['mins_90s'] = detailed_stats['mins'] / 90
+        detailed_stats['percent_matches'] = ((detailed_stats['appearances'] / detailed_stats['team_matches']) * 100) if \
+            detailed_stats['team_matches'] > 0 else 0
+        # potential mins=(pp.mins / (90 * pp.appearances) * 100)
+        detailed_stats['percent_potential_mins'] = (
+                detailed_stats['mins'] / (90 * detailed_stats['appearances']) * 100) if detailed_stats[
+                                                                                            'appearances'] > 0 else 0
+        detailed_stats['goals_per_90'] = (detailed_stats['goals'] / detailed_stats['mins_90s']) if detailed_stats[
+                                                                                                       'mins_90s'] > 0 else 0
+        detailed_stats['mins_per_goal'] = (detailed_stats['mins'] / detailed_stats['goals']) if detailed_stats[
+                                                                                                    'goals'] > 0 else 0
+        detailed_stats['assists_per_90'] = (detailed_stats['assists'] / detailed_stats['mins_90s']) if detailed_stats[
+                                                                                                           'mins_90s'] > 0 else 0
+        detailed_stats['goal_contributions'] = detailed_stats['assists'] + detailed_stats['goals']
+        detailed_stats['goal_contributions_per_90'] = (
+                detailed_stats['goal_contributions'] / detailed_stats['mins_90s']) if detailed_stats[
+                                                                                          'mins_90s'] > 0 else 0
+        detailed_stats['conceded_per_90'] = (detailed_stats['conceded'] / detailed_stats['mins_90s']) if detailed_stats[
+                                                                                                             'mins_90s'] > 0 else 0
+        return detailed_stats
