@@ -5,6 +5,7 @@ from mongoengine import *
 from functions import convert_object_ids_to_string
 
 class Round(EmbeddedDocument):
+    _id = ObjectIdField()
     matchups = ListField(ReferenceField('Match'))
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

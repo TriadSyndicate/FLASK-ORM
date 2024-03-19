@@ -26,7 +26,6 @@ class PlayerController:
     def get_all_players(self):
         try:
             players = self.player.get_all_players()
-            print('players_all', players)
             serialized_players = [convert_object_ids_to_string(player)
                                   for player in players
                                 ]
