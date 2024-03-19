@@ -33,8 +33,10 @@ if __name__ == "__main__":
     from routes.matches_routes import matches_blueprint
     from routes.player_routes import players_blueprint
     from routes.teams_routes import teams_blueprint
+    from routes.get_collection_routes import get_collection_blueprint
     # Register the match routes blueprint
     app.register_blueprint(matches_blueprint, url_prefix='/api/matches')
     app.register_blueprint(players_blueprint, url_prefix='/api/players')
     app.register_blueprint(teams_blueprint, url_prefix="/api/teams")
+    app.register_blueprint(get_collection_blueprint, url_prefix='/api/get-collection')
     app.run(debug=True)

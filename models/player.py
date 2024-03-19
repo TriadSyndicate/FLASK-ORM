@@ -2,7 +2,7 @@
 from mongoengine import *
 from bson.objectid import ObjectId
 
-from functions import return_oid
+from functions import convert_object_ids_to_string, return_oid
 from models.match import MatchStats
 from models.goal import Goal
 
@@ -95,7 +95,7 @@ class Player(DynamicDocument):
     jersey_num = IntField(default=0)
     position = StringField(default=None)
     stats = EmbeddedDocumentField('Stats')
-    performance = EmbeddedDocumentField(PlayerPerformance)
+    performance = EmbeddedDocumentField(PlayerPerformance, default=PlayerPerformance())
     teams = EmbeddedDocumentListField(PlayerTeam, default=[])
     matches = ListField(ReferenceField('Match', dbref=False))
     supporting_file = StringField(default=None)
@@ -112,3 +112,33 @@ class Player(DynamicDocument):
             return cls.convert_object_ids_to_string(player.to_mongo())
         except Exception as e:
             return {"error": f"Failed to retrieve player: {str(e)}"}
+        
+    # Get all players
+    @classmethod
+    def get_all_players(cls):
+        try:
+            players = cls.objects()  # Retrieve all documents from the collection
+            serialized_players = []
+            for player in players:
+                player_data = player
+                
+                # If performance_data is a list, convert it to a dictionary
+                if isinstance(player_data['performance'], list):
+                    player_data['performance'] = {}
+                # Check if performance field is missing or not an EmbeddedDocument
+                if not isinstance(player_data.get('performance'), EmbeddedDocument):
+                    # Initialize performance_data as an empty dictionary
+                    performance_data = {}
+                else:
+                    # Extract performance data
+                    performance_data = player_data.get('performance').to_dict()
+                
+                    
+                # Update player_data with performance data
+                player_data['performance'] = performance_data
+
+                # Append updated player_data to serialized_players
+                serialized_players.append(convert_object_ids_to_string(player_data.to_mongo()))
+            return serialized_players
+        except Exception as e:
+            return {"error": f"Failed to retrieve players: {str(e)}"}

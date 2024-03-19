@@ -1,5 +1,7 @@
 from mongoengine import *
 
+from functions import convert_object_ids_to_string
+
 
 class Competition(Document):
     name = StringField(required=True)
@@ -14,3 +16,13 @@ class Competition(Document):
         super().__init__(*args, **values)
         from models.body import Body
         from models.team import Team
+        
+    # get all competitions
+    @classmethod
+    def get_all_competitions(cls):
+        try:
+            competitions = cls.objects()  # Retrieve all documents from the collection
+            serialized_competitions = [convert_object_ids_to_string(competition.to_mongo()) for competition in competitions]
+            return serialized_competitions  # Return serialized competitions as a list of dictionaries
+        except Exception as e:
+            return {"error": f"Failed to retrieve competitions: {str(e)}"}

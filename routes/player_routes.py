@@ -16,3 +16,14 @@ def get_players_specific():
     return player_controller.getPlayerSpecific(collection_ids)
 
 # insert / create player / move player
+# Insert Player Endpoint
+@players_blueprint.route('/insert', methods=['POST'])
+def insert_player():
+    player_data = json.loads(request.data)
+    return player_controller.insert_player(player_data)
+
+# Move Player
+@players_blueprint.route('/move', methods=['POST'])
+def move_player():
+    data = json.loads(request.data)
+    return player_controller.move_player(data)

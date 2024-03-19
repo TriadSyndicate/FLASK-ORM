@@ -7,7 +7,7 @@ from functions import convert_object_ids_to_string, print_and_return_error, retu
 
 from mongoengine import DoesNotExist
 
-from models.player import Player, PlayerPerformance, Stats
+from models.player import Player, PlayerPerformance, PlayerTeam, Stats
 from models.goal import Goal
 from models.match import MatchStats, Match
 from models.team import Team
@@ -20,6 +20,19 @@ class PlayerController:
         from models.match import Match, MatchStats 
         self.match = Match()
         self.player = Player()
+        
+        
+    # get all players method
+    def get_all_players(self):
+        try:
+            players = self.player.get_all_players()
+            print('players_all', players)
+            serialized_players = [convert_object_ids_to_string(player)
+                                  for player in players
+                                ]
+            return jsonify({"players": serialized_players}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
         
     def check_if_add(self, player, match, team_id):
         utc = pytz.UTC
@@ -787,3 +800,92 @@ class PlayerController:
         detailed_stats['conceded_per_90'] = (detailed_stats['conceded'] / detailed_stats['mins_90s']) if detailed_stats[
                                                                                                              'mins_90s'] > 0 else 0
         return detailed_stats
+    
+    # def check_for_duplicate_player(self, name):
+    #     # Query the database to check for players with the given name
+    #     existing_player = Player.objects(name=name).first()
+    #     return existing_player is not None  # Return True if a player with the given name exists, otherwise False
+    
+    # for dob, name, jersey_num - checker
+    def check_for_duplicate_player(self, name, dob, jersey_num):
+        # Query the database to check for players with the same name, dob, and jersey_num
+        existing_player = Player.objects(name=name, dob=dob, jersey_num=jersey_num).first()
+        return existing_player is not None  # Return True if a player with the same attributes exists, otherwise False
+    
+    def insert_player(self, player_data):
+        try:
+            name = player_data['names'].strip().title()
+            nationality = player_data['nationality']
+            dob = player_data['dob']
+            # Check if dob is not an empty string
+            if dob:
+                # Convert the string to a datetime object
+                original_dob = datetime.strptime(dob, '%Y-%m-%d')
+                # Format the datetime object into the desired format 'dd/mm/yyyy'
+                dob = original_dob.strftime('%d/%m/%Y')
+            position = player_data['position']
+            jersey_num = player_data['jersey_num']
+            #supporting_file = player_data['supporting_file']
+            reg_date = player_data['reg_date']
+
+            # Check for duplicate player
+            if self.check_for_duplicate_player(name, dob, jersey_num):
+                return jsonify({"message": "This player already exists in the database. Please use move player instead"}), 200
+
+            # Get team from database
+            db_team = Team.objects(id=ObjectId(player_data['team_id'])).get()
+
+            # Create new player object
+            new_player = Player(
+                name=name,
+                dob=dob,
+                nationality=nationality,
+                jersey_num=jersey_num,
+                #supporting_file=supporting_file,
+                position=position
+            )
+            
+            # Create player club association
+            player_club = PlayerTeam(team_id=db_team.id, reg_date=reg_date, on_team=True)
+            new_player.teams.append(player_club)
+
+            # Save player to the database
+            new_player.save()
+
+            # Add player to team roster
+            db_team.update(add_to_set__roster=new_player.id)
+
+            return jsonify({"player": convert_object_ids_to_string(new_player.to_mongo())}), 201
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+        
+    # Move player atp
+    def move_player(self, data):
+        try: 
+            player_id = return_oid(data['player_id'])
+            db_player = Player.objects(id=player_id).first()
+            if not db_player:
+                return jsonify({"error": 'Player not found check ID'}), 404
+
+            if data['old_team_id']:
+                old_team_id = return_oid(data['old_team_id'])
+                # update player docs
+                db_player.teams.filter(team_id=old_team_id).update(set__on_team=False)
+                old_team = Team.objects(id=old_team_id).first()
+                if old_team:
+                    old_team.update(pull__roster=player_id)
+
+            new_team_id = return_oid(data['new_team_id'])
+            reg_date = data['reg_date']
+
+            new_team = PlayerTeam(team_id=new_team_id, reg_date=reg_date, on_team=True)
+            db_player.teams.append(new_team)
+            db_player.save()
+
+            new_team = Team.objects(id=new_team_id).first()
+            if new_team:
+                new_team.update(add_to_set__roster=player_id)
+
+            return jsonify({"player": convert_object_ids_to_string(db_player.to_mongo())}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
