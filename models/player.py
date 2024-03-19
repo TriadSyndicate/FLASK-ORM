@@ -95,7 +95,7 @@ class Player(DynamicDocument):
     jersey_num = IntField(default=0)
     position = StringField(default=None)
     stats = EmbeddedDocumentField('Stats')
-    performance = EmbeddedDocumentField(PlayerPerformance, default=PlayerPerformance())
+    performance = EmbeddedDocumentField(PlayerPerformance, default={})
     teams = EmbeddedDocumentListField(PlayerTeam, default=[])
     matches = ListField(ReferenceField('Match', dbref=False))
     supporting_file = StringField(default=None)
@@ -119,26 +119,23 @@ class Player(DynamicDocument):
         try:
             players = cls.objects()  # Retrieve all documents from the collection
             serialized_players = []
+
             for player in players:
-                player_data = player
-                
-                # If performance_data is a list, convert it to a dictionary
-                if isinstance(player_data['performance'], list):
-                    player_data['performance'] = {}
-                # Check if performance field is missing or not an EmbeddedDocument
-                if not isinstance(player_data.get('performance'), EmbeddedDocument):
-                    # Initialize performance_data as an empty dictionary
+                player_data = convert_object_ids_to_string(player.to_mongo())
+                performance_data = player_data.get('performance', {})
+
+                # Check if performance_data is a list
+                if isinstance(performance_data, list):
+                    # If performance_data is a list, initialize it as an empty dictionary
                     performance_data = {}
-                else:
-                    # Extract performance data
-                    performance_data = player_data.get('performance').to_dict()
-                
-                    
+
                 # Update player_data with performance data
                 player_data['performance'] = performance_data
 
                 # Append updated player_data to serialized_players
-                serialized_players.append(convert_object_ids_to_string(player_data.to_mongo()))
+                serialized_players.append(player_data)
+
             return serialized_players
         except Exception as e:
             return {"error": f"Failed to retrieve players: {str(e)}"}
+
