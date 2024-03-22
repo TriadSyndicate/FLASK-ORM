@@ -109,7 +109,7 @@ class Player(DynamicDocument):
     def get_player_by_id(cls, player_id):
         try:
             player = cls.objects(id=ObjectId(player_id)).first()
-            return cls.convert_object_ids_to_string(player.to_mongo())
+            return convert_object_ids_to_string(player.to_mongo())
         except Exception as e:
             return {"error": f"Failed to retrieve player: {str(e)}"}
         

@@ -33,6 +33,16 @@ class PlayerController:
         except Exception as e:
             return jsonify({"error": str(e)}), 500
         
+    # Get one player by Id
+    def get_player_by_id(self, player_id):
+        try:
+            player = self.player.get_player_by_id(player_id=player_id)
+            
+            return jsonify({"player": convert_object_ids_to_string(player)}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+        
+            
     def check_if_add(self, player, match, team_id):
         utc = pytz.UTC
         date_string = match['date']

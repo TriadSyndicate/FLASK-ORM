@@ -27,3 +27,9 @@ def insert_player():
 def move_player():
     data = json.loads(request.data)
     return player_controller.move_player(data)
+
+# Get specific player by Id
+@players_blueprint.route('/get-by-id/<player_id>')
+def get_player_by_id(player_id):
+    return player_controller.get_player_by_id(player_id=player_id)
+    

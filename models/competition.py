@@ -1,3 +1,4 @@
+from bson import ObjectId
 from mongoengine import *
 
 from functions import convert_object_ids_to_string
@@ -26,3 +27,12 @@ class Competition(Document):
             return serialized_competitions  # Return serialized competitions as a list of dictionaries
         except Exception as e:
             return {"error": f"Failed to retrieve competitions: {str(e)}"}
+        
+    # Get specific player by Id
+    @classmethod
+    def get_competition_by_id(cls, competition_id):
+        try:
+            competition = cls.objects(id=ObjectId(competition_id)).first()
+            return convert_object_ids_to_string(competition.to_mongo())
+        except Exception as e:
+            return {"error": f"Failed to retrieve competition: {str(e)}"}
